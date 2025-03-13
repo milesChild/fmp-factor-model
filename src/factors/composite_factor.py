@@ -2,6 +2,7 @@ from typing import List, Optional
 import pandas as pd
 import numpy as np
 from src.factors.characteristic import Characteristic
+from src.factors.factor_util import z_score
 
 class CompositeFactor:
     """A composite factor made up of multiple characteristics."""
@@ -79,24 +80,32 @@ class CompositeFactor:
 
     def process_loadings(self) -> None:
         """
-        Process the loadings for each characteristic and combine them using weights.
-        Sets self._loadings to a weighted combination of characteristic loadings.
+        Process the loadings for each characteristic into a composite, normalized loading 
+        (z-score). Sumproducts the weights and loadings of each characteristic, then
+        runs a z-score of the weighted sum.
         """
-        # Initialize with zeros
-        result = np.zeros_like(self.characteristics[0].raw_vector, dtype=float)
-        
-        # Add weighted contribution from each characteristic
+        # Process loadings for each characteristic
         for char in self.characteristics:
-            char_loadings = char.get_loadings()
-            if char_loadings is None:
-                raise ValueError(f"Failed to get loadings for characteristic {char.config.name}")
-            result += char_loadings.values * char.config.weight
+            char.process_loadings()
         
-        # Create final Series
+        # Get all characteristic loadings as Series
+        char_loadings = [char.get_loadings() for char in self.characteristics]
+        char_weights = [char.config.weight for char in self.characteristics]
+        
+        # Calculate weighted sum of loadings
+        weighted_sum = pd.Series(0, index=self.characteristics[0].date_vector)
+        for loading, weight in zip(char_loadings, char_weights):
+            if weight is None:
+                raise ValueError("Can not process loadings with a weight of None")
+            if loading is None:
+                raise ValueError("Can not process loadings with a loading of None")
+            weighted_sum += loading * weight
+            
+        # Z-score the weighted sum
         self._loadings = pd.Series(
-            data=result,
-            index=self.characteristics[0].date_vector,
-            name="composite_factor"
+            data=z_score(weighted_sum.values),
+            index=weighted_sum.index,
+            name="Composite Factor"
         )
 
     def get_loadings(self) -> Optional[pd.Series]:

@@ -208,3 +208,107 @@ class TestWeightValidation:
         weights = [char.config.weight for char in factor.characteristics]
         assert all(w == pytest.approx(1/3) for w in weights)
         assert sum(weights) == pytest.approx(1.0)
+
+class TestLoadingProcessing:
+    """Tests for composite factor loading processing."""
+    
+    @pytest.fixture
+    def mock_zscore(self):
+        """Create a mock z-score function that returns predictable values."""
+        with patch('src.factors.composite_factor.z_score') as mock:
+            mock.side_effect = lambda x: x * 2  # Simple transformation for testing
+            yield mock
+    
+    def test_weighted_sum_calculation(self, valid_dates):
+        """Test the weighted sum calculation of loadings."""
+        # Create a mock characteristic class that returns raw values
+        class MockCharacteristic(Characteristic):
+            def get_loadings(self):
+                return pd.Series(
+                    data=self.raw_vector,
+                    index=self.date_vector,
+                    name=self.config.name
+                )
+        
+        # Patch z_score in the composite factor module
+        with patch('src.factors.composite_factor.z_score') as mock_zscore:
+            mock_zscore.side_effect = lambda x: x * 2  # Simple transformation for testing
+            
+            # Create characteristics with known values
+            chars = [
+                MockCharacteristic(
+                    valid_dates[:3],
+                    np.array([1.0, 2.0, 3.0]),
+                    CharacteristicConfig(name="Char1", weight=0.5)
+                ),
+                MockCharacteristic(
+                    valid_dates[:3],
+                    np.array([4.0, 5.0, 6.0]),
+                    CharacteristicConfig(name="Char2", weight=0.3)
+                ),
+                MockCharacteristic(
+                    valid_dates[:3],
+                    np.array([7.0, 8.0, 9.0]),
+                    CharacteristicConfig(name="Char3", weight=0.2)
+                )
+            ]
+            
+            factor = CompositeFactor(chars)
+            factor.process_loadings()
+            
+            # Calculate expected weighted sums
+            weighted_sums = np.array([
+                1.0 * 0.5 + 4.0 * 0.3 + 7.0 * 0.2,  # = 3.1
+                2.0 * 0.5 + 5.0 * 0.3 + 8.0 * 0.2,  # = 4.1
+                3.0 * 0.5 + 6.0 * 0.3 + 9.0 * 0.2   # = 5.1
+            ])
+            
+            # The final values should be z-scored
+            expected_final = weighted_sums * 2  # Due to mock z-score
+            pd.testing.assert_series_equal(
+                factor._loadings,
+                pd.Series(data=expected_final, index=valid_dates[:3], name="Composite Factor")
+            )
+    
+    def test_error_handling(self, valid_dates):
+        """Test error handling during loading processing."""
+        test_data = np.array([1.0, 2.0, 3.0, 4.0, 5.0])  # Match date length
+        
+        class FailingCharacteristic(Characteristic):
+            def get_loadings(self):
+                return None
+        
+        chars = [
+            Characteristic(
+                valid_dates,
+                test_data.copy()
+            ),
+            FailingCharacteristic(
+                valid_dates,
+                test_data.copy()
+            )
+        ]
+        
+        factor = CompositeFactor(chars)
+        with pytest.raises(ValueError, match="Can not process loadings with a loading of None"):
+            factor.process_loadings()
+    
+    def test_reprocessing_behavior(self, valid_characteristics, mock_zscore):
+        """Test that reprocessing updates loadings appropriately."""
+        factor = CompositeFactor(valid_characteristics)
+        
+        # Initial processing
+        factor.process_loadings()
+        initial_loadings = factor._loadings.copy()
+        
+        # Modify a characteristic's raw values
+        factor.characteristics[0].raw_vector = factor.characteristics[0].raw_vector * 2
+        
+        # Reset the mock to return different values
+        mock_zscore.side_effect = lambda x: x * 3  # Change transformation
+        
+        # Reprocess
+        factor.process_loadings()
+        
+        # Verify loadings were updated
+        assert not factor._loadings.equals(initial_loadings)
