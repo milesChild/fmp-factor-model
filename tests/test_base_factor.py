@@ -1,9 +1,11 @@
 import pytest
 import numpy as np
 import datetime
-from typing import List, Optional
+from typing import List
 import pandas as pd
 from src.factors.base_factor import BaseFactor
+
+# credit for tests goes to claude
 
 class MockFactor(BaseFactor):
     """Mock implementation of BaseFactor for testing."""

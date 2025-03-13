@@ -2,7 +2,6 @@ import pytest
 from unittest.mock import patch, Mock
 import requests
 import pandas as pd
-from io import StringIO
 import sys
 from pathlib import Path
 
