@@ -1,4 +1,6 @@
 requests
 pytest
 pytest-mock
+numpy
 pandas
+python-dotenv
