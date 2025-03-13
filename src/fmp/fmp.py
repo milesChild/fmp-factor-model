@@ -2,13 +2,13 @@ import requests
 import pandas as pd
 from io import StringIO
 from typing import Optional
-from routes import (
+from src.fmp.routes import (
     BASE_URL,
     QUOTE_PATH,
     BULK_INCOME_STATEMENT_PATH,
     BULK_BALANCE_SHEET_PATH
 )
-from util import validate_year, validate_period
+from src.fmp.util import validate_year, validate_period
 
 class FMP:
     """Simplified FMP wrapper for getting factor model data. Not exhaustive impl of actual API endpoints."""
