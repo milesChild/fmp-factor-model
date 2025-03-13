@@ -1,12 +1,14 @@
 import requests
+import pandas as pd
+from io import StringIO
 from typing import Optional
-from src.routes import (
+from routes import (
     BASE_URL,
     QUOTE_PATH,
     BULK_INCOME_STATEMENT_PATH,
     BULK_BALANCE_SHEET_PATH
 )
-from src.util import validate_year, validate_period
+from util import validate_year, validate_period
 
 class FMP:
     """Simplified FMP wrapper for getting factor model data. Not exhaustive impl of actual API endpoints."""
@@ -45,7 +47,7 @@ class FMP:
         except Exception as e:
             return f"Unexpected error while testing API key: {str(e)}"
         
-    def get_bulk_income_statement(self, year: str, period: str) -> dict:
+    def get_bulk_income_statement(self, year: str, period: str) -> pd.DataFrame:
         """
         Gets bulk income statement data for a given year and period.
 
@@ -60,9 +62,33 @@ class FMP:
             raise ValueError("Invalid year")
         if not validate_period(period):
             raise ValueError("Invalid period")
-        raise NotImplementedError()
+        
+        url = f"{BASE_URL}/{BULK_INCOME_STATEMENT_PATH}?year={year}&period={period}&apikey={self.api_key}"
+        
+        try:
+            response = requests.get(url)
+            
+            # Check if response is CSV
+            content_type = response.headers.get('content-type', '')
+            if 'text/csv' in content_type:
+                return pd.read_csv(StringIO(response.text))
+            
+            # If not CSV, try JSON
+            if response.status_code != 200:
+                error_msg = response.json().get('message', 'Unknown error') if response.text else 'Empty response'
+                raise ValueError(f"API request failed with status code {response.status_code}: {error_msg}")
+            
+            # If JSON response, convert to DataFrame
+            return pd.DataFrame(response.json())
+        
+        except requests.RequestException as e:
+            raise ValueError(f"Could not connect to FMP API: {str(e)}")
+        except ValueError as e:
+            raise e
+        except Exception as e:
+            raise ValueError(f"Error processing response: {str(e)}")
     
-    def get_bulk_balance_sheet(self, year: str, period: str) -> 'pd.DataFrame':
+    def get_bulk_balance_sheet(self, year: str, period: str) -> pd.DataFrame:
         """
         Gets bulk balance sheet data for a given year and period.
 
@@ -85,8 +111,6 @@ class FMP:
             # Check if response is CSV
             content_type = response.headers.get('content-type', '')
             if 'text/csv' in content_type:
-                import pandas as pd
-                from io import StringIO
                 return pd.read_csv(StringIO(response.text))
             
             # If not CSV, try JSON
@@ -95,7 +119,6 @@ class FMP:
                 raise ValueError(f"API request failed with status code {response.status_code}: {error_msg}")
             
             # If JSON response, convert to DataFrame
-            import pandas as pd
             return pd.DataFrame(response.json())
         
         except requests.RequestException as e:
@@ -105,15 +128,12 @@ class FMP:
         except Exception as e:
             raise ValueError(f"Error processing response: {str(e)}")
 
+if __name__ == "__main__":
+    from dotenv import load_dotenv
+    import os
 
-from dotenv import load_dotenv
-import os
-
-load_dotenv()
-api_key = os.getenv('FPM_API_KEY')
-fmp = FMP(api_key)
-df = fmp.get_bulk_balance_sheet("2024", "Q1")
-# Save to CSV if needed
-df.to_csv("bulk_balance_sheet.csv", index=False)
-
-
+    load_dotenv()
+    api_key = os.getenv('FPM_API_KEY')
+    fmp = FMP(api_key)
+    df = fmp.get_bulk_income_statement("2024", "Q1")
+    df.to_csv("data/bulk_income_statement.csv", index=False)
