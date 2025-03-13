@@ -47,23 +47,23 @@ class FMP:
         except Exception as e:
             return f"Unexpected error while testing API key: {str(e)}"
         
-    def get_bulk_income_statement(self, year: str, period: str) -> pd.DataFrame:
+    def __get_bulk_data(self, endpoint: str, year: str, period: str) -> pd.DataFrame:
         """
-        Gets bulk income statement data for a given year and period.
-
+        Generic helper method to get bulk financial data from FMP.
+        
         params:
-            year (str): the year to get data for (e.g. "2024")
-            period (str): the period, in quarters, to get data for (e.g. "Q1", "Q2", "Q3", "Q4")
+            endpoint (str): the API endpoint to use
+            year (str): the year to get data for
+            period (str): the period to get data for
         returns:
-            dict: the bulk income statement data
+            pd.DataFrame: the financial data as a pandas DataFrame
         """
-        # Endpoint: https://financialmodelingprep.com/stable/income-statement-bulk?year=YEAR&period=Q1
         if not validate_year(year):
             raise ValueError("Invalid year")
         if not validate_period(period):
             raise ValueError("Invalid period")
         
-        url = f"{BASE_URL}/{BULK_INCOME_STATEMENT_PATH}?year={year}&period={period}&apikey={self.api_key}"
+        url = f"{BASE_URL}/{endpoint}?year={year}&period={period}&apikey={self.api_key}"
         
         try:
             response = requests.get(url)
@@ -87,7 +87,19 @@ class FMP:
             raise e
         except Exception as e:
             raise ValueError(f"Error processing response: {str(e)}")
-    
+
+    def get_bulk_income_statement(self, year: str, period: str) -> pd.DataFrame:
+        """
+        Gets bulk income statement data for a given year and period.
+
+        params:
+            year (str): the year to get data for (e.g. "2024")
+            period (str): the period, in quarters, to get data for (e.g. "Q1", "Q2", "Q3", "Q4")
+        returns:
+            pd.DataFrame: the bulk income statement data
+        """
+        return self.__get_bulk_data(BULK_INCOME_STATEMENT_PATH, year, period)
+
     def get_bulk_balance_sheet(self, year: str, period: str) -> pd.DataFrame:
         """
         Gets bulk balance sheet data for a given year and period.
@@ -98,35 +110,7 @@ class FMP:
         returns:
             pd.DataFrame: the bulk balance sheet data as a pandas DataFrame
         """
-        if not validate_year(year):
-            raise ValueError("Invalid year")
-        if not validate_period(period):
-            raise ValueError("Invalid period")
-        
-        url = f"{BASE_URL}/{BULK_BALANCE_SHEET_PATH}?year={year}&period={period}&apikey={self.api_key}"
-        
-        try:
-            response = requests.get(url)
-            
-            # Check if response is CSV
-            content_type = response.headers.get('content-type', '')
-            if 'text/csv' in content_type:
-                return pd.read_csv(StringIO(response.text))
-            
-            # If not CSV, try JSON
-            if response.status_code != 200:
-                error_msg = response.json().get('message', 'Unknown error') if response.text else 'Empty response'
-                raise ValueError(f"API request failed with status code {response.status_code}: {error_msg}")
-            
-            # If JSON response, convert to DataFrame
-            return pd.DataFrame(response.json())
-        
-        except requests.RequestException as e:
-            raise ValueError(f"Could not connect to FMP API: {str(e)}")
-        except ValueError as e:
-            raise e
-        except Exception as e:
-            raise ValueError(f"Error processing response: {str(e)}")
+        return self.__get_bulk_data(BULK_BALANCE_SHEET_PATH, year, period)
 
 if __name__ == "__main__":
     from dotenv import load_dotenv
