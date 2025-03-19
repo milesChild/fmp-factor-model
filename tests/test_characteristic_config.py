@@ -1,5 +1,5 @@
 import pytest
-from src.factors.characteristic_config import CharacteristicConfig
+from src.factors.characteristic_config import CharacteristicConfig, NaMethod
 
 class TestCharacteristicConfigInitialization:
     """Tests for characteristic config initialization functionality."""
@@ -11,6 +11,7 @@ class TestCharacteristicConfigInitialization:
         assert config.log_raw_values is False
         assert config.winsorize_raw_values is True
         assert config.weight is None
+        assert config.na_method == NaMethod.MEDIAN
 
     def test_valid_custom_initialization(self):
         """Test initialization with custom values."""
@@ -18,12 +19,14 @@ class TestCharacteristicConfigInitialization:
             name="Test Characteristic",
             log_raw_values=True,
             winsorize_raw_values=False,
-            weight=0.5
+            weight=0.5,
+            na_method=NaMethod.MEAN
         )
         assert config.name == "Test Characteristic"
         assert config.log_raw_values is True
         assert config.winsorize_raw_values is False
         assert config.weight == 0.5
+        assert config.na_method == NaMethod.MEAN
 
     # Name validation tests
     def test_empty_name(self):
@@ -97,4 +100,15 @@ class TestCharacteristicConfigInitialization:
                 log_raw_values="invalid",
                 winsorize_raw_values=None,
                 weight=2.0
-            ) 
+            )
+
+    # Na method validation tests
+    def test_invalid_na_method_type(self):
+        """Test initialization with invalid na_method type."""
+        with pytest.raises(ValueError, match="na_method must be a NaMethod"):
+            CharacteristicConfig(na_method="MEAN")
+
+    def test_valid_na_method_type(self):
+        """Test initialization with valid na_method type."""
+        config = CharacteristicConfig(na_method=NaMethod.MEAN)
+        assert config.na_method == NaMethod.MEAN

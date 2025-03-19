@@ -2,7 +2,7 @@ import pytest
 import numpy as np
 import pandas as pd
 from src.factors.cross_sectional_characteristic import CrossSectionalCharacteristic
-from src.factors.characteristic_config import CharacteristicConfig
+from src.factors.characteristic_config import CharacteristicConfig, NaMethod
 from unittest.mock import patch
 
 # Fixtures for common test data
@@ -207,3 +207,73 @@ class TestLoadingsRetrieval:
         mock_transforms['winsorize'].assert_not_called()
         mock_transforms['z_score'].assert_not_called()
         assert first_loadings is second_loadings 
+
+class TestNaHandling:
+    """Tests for handling NA values in characteristics."""
+    
+    @pytest.fixture
+    def vector_with_nas(self):
+        """Create a vector with NA values."""
+        return np.array([1.0, 2.0, 3.0, np.nan, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 
+                        11.0, np.nan, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0,
+                        21.0, 22.0, 23.0, np.nan, 25.0, 26.0, 27.0, 28.0])
+
+    def test_mean_imputation(self, vector_with_nas):
+        """Test that NA values are properly imputed with mean when using NaMethod.MEAN."""
+        config = CharacteristicConfig(na_method=NaMethod.MEAN)
+        char = CrossSectionalCharacteristic(vector_with_nas, config)
+        char.get_loadings()
+        
+        # assert that no values are nan
+        assert not np.any(np.isnan(char._loadings.values))
+        # assert that all the values that were originaly nan are now equal to eachother
+        na_indices = np.where(pd.isna(vector_with_nas))[0]
+        assert np.all(char._loadings.values[na_indices] == char._loadings.values[na_indices[0]])
+
+    def test_median_imputation(self, vector_with_nas):
+        """Test that NA values are properly imputed with median when using NaMethod.MEDIAN."""
+        
+        config = CharacteristicConfig(na_method=NaMethod.MEDIAN)
+        char = CrossSectionalCharacteristic(vector_with_nas, config)
+        char.get_loadings()
+
+        # assert that no values are nan
+        assert not np.any(np.isnan(char._loadings.values))
+        # assert that all the values that were originaly nan are now equal to eachother
+        na_indices = np.where(pd.isna(vector_with_nas))[0]
+        assert np.all(char._loadings.values[na_indices] == char._loadings.values[na_indices[0]])
+
+    def test_all_na_values(self):
+        """Test handling of a vector containing all NA values."""
+        all_na_vector = np.array([np.nan, np.nan, np.nan])
+        
+        # Test MEAN/MEDIAN - should raise an error as no valid values to compute from
+        config_mean = CharacteristicConfig(na_method=NaMethod.MEAN)
+        with pytest.raises(ValueError, match="Raw values must contain at least one non-NA value"):
+            char_mean = CrossSectionalCharacteristic(all_na_vector, config_mean)
+            char_mean.get_loadings()
+
+    def test_single_non_na_value(self):
+        """Test handling of a vector containing only one non-NA value."""
+        vector = np.array([np.nan, np.nan, 5.0, np.nan])
+        
+        # Test MEAN/MEDIAN - should work and fill all values with 5.0
+        config_mean = CharacteristicConfig(na_method=NaMethod.MEAN)
+        char_mean = CrossSectionalCharacteristic(vector, config_mean)
+        loadings_mean = char_mean.get_loadings()
+        assert len(loadings_mean) == len(vector)
+        assert np.all(loadings_mean == 0)  # All values same after z-scoring
+
+    def test_na_handling_with_transformations(self, vector_with_nas):
+        """Test that NA handling works correctly with log and winsorize transformations."""
+        config = CharacteristicConfig(
+            na_method=NaMethod.MEAN,
+            log_raw_values=True,
+            winsorize_raw_values=True
+        )
+        char = CrossSectionalCharacteristic(vector_with_nas, config)
+        
+        loadings = char.get_loadings()
+        # Basic checks
+        assert len(loadings) == len(vector_with_nas)
+        assert not np.any(pd.isna(loadings))  # Just verify no NAs remain 
