@@ -2,7 +2,6 @@ import pytest
 from unittest.mock import patch, Mock
 import requests
 import pandas as pd
-from io import StringIO
 import sys
 from pathlib import Path
 
@@ -11,8 +10,8 @@ src_path = str(Path(__file__).parent.parent / "src")
 if src_path not in sys.path:
     sys.path.append(src_path)
 
-from fmp import FMP
-from routes import BASE_URL, QUOTE_PATH
+from fmp.fmp import FMP
+from fmp.routes import BASE_URL, QUOTE_PATH
 
 # Tests written with the help of claude 3.5 sonnet. Not really necessary for this project
 
@@ -130,7 +129,7 @@ MOCK_INCOME_STATEMENT_JSON = [
 
 @pytest.fixture
 def fmp_client():
-    with patch('fmp.FMP._FMP__test_api_key', return_value=None):
+    with patch('fmp.fmp.FMP._FMP__test_api_key', return_value=None):
         return FMP("dummy_api_key")
 
 def test_get_bulk_balance_sheet_csv_success(fmp_client):
