@@ -4,8 +4,9 @@ import numpy as np
 
 from src.factors.characteristic_config import CharacteristicConfig
 from src.factors.factor_util import log_transform, winsorize, z_score
+from src.factors.factor_interface import FactorInterface
 
-class CrossSectionalCharacteristic:
+class CrossSectionalCharacteristic(FactorInterface):
     """A cross-sectional characteristic is an attribute of a security that is used when creating composite factors."""
 
     def __init__(

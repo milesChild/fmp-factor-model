@@ -2,9 +2,10 @@ from typing import List, Optional
 import pandas as pd
 import numpy as np
 from src.factors.cross_sectional_characteristic import CrossSectionalCharacteristic
+from src.factors.factor_interface import FactorInterface
 from src.factors.factor_util import z_score
 
-class CompositeCrossSectionalFactor:
+class CompositeCrossSectionalFactor(FactorInterface):
     """A composite cross-sectional factor made up of multiple characteristics."""
     
     def __init__(self, characteristics: List[CrossSectionalCharacteristic], name: str = "Composite Factor") -> None:
@@ -20,8 +21,8 @@ class CompositeCrossSectionalFactor:
         
         self._validate_characteristics(characteristics)
         self.characteristics = characteristics
-        self._loadings: Optional[pd.Series] = None
         self.name = name
+        self._loadings: Optional[pd.Series] = None
         
         # Validate/normalize weights
         self._normalize_weights()
