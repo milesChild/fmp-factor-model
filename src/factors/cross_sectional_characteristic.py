@@ -2,10 +2,11 @@ from typing import Optional
 import pandas as pd
 import numpy as np
 
-from src.factors.characteristic_config import CharacteristicConfig
+from src.factors.characteristic_config import CharacteristicConfig, NaMethod
 from src.factors.factor_util import log_transform, winsorize, z_score
+from src.factors.factor_interface import FactorInterface
 
-class CrossSectionalCharacteristic:
+class CrossSectionalCharacteristic(FactorInterface):
     """A cross-sectional characteristic is an attribute of a security that is used when creating composite factors."""
 
     def __init__(
@@ -43,6 +44,9 @@ class CrossSectionalCharacteristic:
         
         if self.raw_vector.ndim != 1:
             raise ValueError("Raw value must be a 1-dimensional array")
+        
+        if np.isnan(self.raw_vector).all():
+            raise ValueError("Raw values must contain at least one non-NA value")
 
     def process_loadings(self) -> None:
         """
@@ -50,7 +54,18 @@ class CrossSectionalCharacteristic:
         Applies transformations based on configuration (log, winsorize).
         Sets self._loadings to the processed values.
         """
-        values = self.raw_vector.copy()
+        # Convert to pandas Series for NA handling
+        values = pd.Series(self.raw_vector.copy())
+
+        # Handle NA according to the configuration
+        # TODO: If more NaMethods are added, this should be refactored
+        if self.config.na_method == NaMethod.MEAN:
+            values = values.fillna(values.mean())
+        elif self.config.na_method == NaMethod.MEDIAN:
+            values = values.fillna(values.median())
+        
+        # Convert back to numpy array for transformations
+        values = values.to_numpy()
         
         # Apply log transformation if configured
         if self.config.log_raw_values:
