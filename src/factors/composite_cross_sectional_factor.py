@@ -1,18 +1,19 @@
 from typing import List, Optional
 import pandas as pd
 import numpy as np
-from src.factors.characteristic import Characteristic
+from src.factors.cross_sectional_characteristic import CrossSectionalCharacteristic
 from src.factors.factor_util import z_score
 
-class CompositeFactor:
-    """A composite factor made up of multiple characteristics."""
+class CompositeCrossSectionalFactor:
+    """A composite cross-sectional factor made up of multiple characteristics."""
     
-    def __init__(self, characteristics: List[Characteristic]) -> None:
+    def __init__(self, characteristics: List[CrossSectionalCharacteristic], name: str = "Composite Factor") -> None:
         """
-        Initialize composite factor with a list of characteristics.
+        Initialize composite cross-sectional factor with a list of characteristics.
 
         params:
-            characteristics (List[Characteristic]): List of characteristics to combine
+            characteristics (List[CrossSectionalCharacteristic]): List of cross-sectional characteristics to combine
+            name (str): Name of the composite factor
         """
         if not characteristics or len(characteristics) == 0:
             raise ValueError("Must provide at least one characteristic")
@@ -20,18 +21,19 @@ class CompositeFactor:
         self._validate_characteristics(characteristics)
         self.characteristics = characteristics
         self._loadings: Optional[pd.Series] = None
+        self.name = name
         
         # Validate/normalize weights
         self._normalize_weights()
     
-    def _validate_characteristics(self, characteristics: List[Characteristic]) -> None:
+    def _validate_characteristics(self, characteristics: List[CrossSectionalCharacteristic]) -> None:
         """
-        Validate that all characteristics share the same date vector.
+        Validate that all characteristics have the same length.
         """
-        date_vector = characteristics[0].date_vector
+        length = len(characteristics[0].raw_vector)
         for char in characteristics[1:]:
-            if len(char.date_vector) != len(date_vector) or any(d1 != d2 for d1, d2 in zip(char.date_vector, date_vector)):
-                raise ValueError(f"Characteristic {str(char)} has mismatched date vector")
+            if len(char.raw_vector) != length:
+                raise ValueError(f"Characteristic {str(char)} has mismatched length")
     
     def _normalize_weights(self) -> None:
         """
@@ -93,7 +95,7 @@ class CompositeFactor:
         char_weights = [char.config.weight for char in self.characteristics]
         
         # Calculate weighted sum of loadings
-        weighted_sum = pd.Series(0, index=self.characteristics[0].date_vector)
+        weighted_sum = pd.Series(0, index=range(len(self.characteristics[0].raw_vector)))
         for loading, weight in zip(char_loadings, char_weights):
             if weight is None:
                 raise ValueError("Can not process loadings with a weight of None")
@@ -104,17 +106,16 @@ class CompositeFactor:
         # Z-score the weighted sum
         self._loadings = pd.Series(
             data=z_score(weighted_sum.values),
-            index=weighted_sum.index,
-            name="Composite Factor"
+            name=self.name
         )
 
     def get_loadings(self) -> Optional[pd.Series]:
         """
-        Get the processed composite factor loadings.
+        Get the processed composite cross-sectional factor loadings.
         If loadings have not been processed, will process them.
         
         returns:
-            Optional[pd.Series]: The composite factor loadings indexed by date
+            Optional[pd.Series]: The composite cross-sectional factor loadings
         """
         if self._loadings is None:
             self.process_loadings()

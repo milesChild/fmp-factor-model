@@ -1,28 +1,25 @@
-from typing import List, Optional
-import datetime
+from typing import Optional
 import pandas as pd
 import numpy as np
+
 from src.factors.characteristic_config import CharacteristicConfig
 from src.factors.factor_util import log_transform, winsorize, z_score
 
-class Characteristic:
-    """A characteristic is an attribute of a security that is used when creating composite factors."""
+class CrossSectionalCharacteristic:
+    """A cross-sectional characteristic is an attribute of a security that is used when creating composite factors."""
 
     def __init__(
         self,
-        date_vector: List[datetime.date],
         raw_vector: np.ndarray,
         config: Optional[CharacteristicConfig] = CharacteristicConfig()
     ) -> None:
         """
-        Initialize characteristic.
+        Initialize cross-sectional characteristic.
 
         params:
-            date_vector (List[datetime.date]): List of dates corresponding to the raw values
-            raw_values (List[np.ndarray]): List of raw value arrays to process into characteristic loadings
+            raw_values (np.ndarray): Array of raw values to process into characteristic loadings
             config (CharacteristicConfig): Configuration for characteristic processing. Default is used if not provided.
         """
-        self.date_vector = date_vector
         self.raw_vector = raw_vector
         self.config = config
         self._validate_characteristic()
@@ -32,18 +29,11 @@ class Characteristic:
 
     def _validate_characteristic(self) -> None:
         """
-        Validate characteristic parameters.
+        Validate cross-sectional characteristic parameters.
         
         raises:
             ValueError: If any validation check fails
         """
-        # Validate date vector
-        if not self.date_vector:
-            raise ValueError("date_vector cannot be empty")
-        
-        if not all(isinstance(d, datetime.date) and not isinstance(d, datetime.datetime) for d in self.date_vector):
-            raise ValueError("All elements in date_vector must be datetime.date objects (not datetime.datetime)")
-
         # Validate raw vector
         if not isinstance(self.raw_vector, np.ndarray):
             raise ValueError("Raw value must be a numpy array")
@@ -53,13 +43,10 @@ class Characteristic:
         
         if self.raw_vector.ndim != 1:
             raise ValueError("Raw value must be a 1-dimensional array")
-        
-        if len(self.raw_vector) != len(self.date_vector):
-            raise ValueError(f"Raw value length ({len(self.raw_vector)}) does not match date_vector length ({len(self.date_vector)})")
 
     def process_loadings(self) -> None:
         """
-        Process the raw values into characteristic loadings (z-scores).
+        Process the raw values into cross-sectional characteristic loadings (z-scores).
         Applies transformations based on configuration (log, winsorize).
         Sets self._loadings to the processed values.
         """
@@ -78,17 +65,16 @@ class Characteristic:
         # Store as Series
         self._loadings = pd.Series(
             data=values,
-            index=self.date_vector,
             name=self.config.name
         )
 
     def get_loadings(self) -> Optional[pd.Series]:
         """
-        Get the processed characteristic loadings.
+        Get the processed cross-sectional characteristic loadings.
         If loadings have not been processed, will process them.
         
         returns:
-            Optional[pd.Series]: The characteristic loadings indexed by date
+            Optional[pd.Series]: The cross-sectional characteristic loadings
         """
         if not isinstance(self._loadings, pd.Series):
             self.process_loadings()
